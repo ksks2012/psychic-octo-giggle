@@ -9,5 +9,6 @@
 *.html
 *.svg
 *.json
+*.db
 
 **/bin/**
