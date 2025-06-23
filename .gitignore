@@ -1,0 +1,13 @@
+**/.vscode/**
+
+*.data
+*.log
+*.tmp
+*.bak
+*.swp
+*.gif
+*.html
+*.svg
+*.json
+
+**/bin/**
