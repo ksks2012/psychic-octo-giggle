@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"psychic-octo-giggle/events"
+	"psychic-octo-giggle/octoevents"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -82,9 +82,9 @@ func (s *GormEventStore) LoadEvents(ctx context.Context, aggregateID string) ([]
 // Helper function: get event type
 func getEventType(event interface{}) string {
 	switch event.(type) {
-	case events.ItemAdded:
+	case octoevents.ItemAdded:
 		return "ItemAdded"
-	case events.ItemRemoved:
+	case octoevents.ItemRemoved:
 		return "ItemRemoved"
 	default:
 		return ""
@@ -94,9 +94,9 @@ func getEventType(event interface{}) string {
 // Helper function: get event timestamp
 func getEventTimestamp(event interface{}) time.Time {
 	switch e := event.(type) {
-	case events.ItemAdded:
+	case octoevents.ItemAdded:
 		return e.Timestamp
-	case events.ItemRemoved:
+	case octoevents.ItemRemoved:
 		return e.Timestamp
 	default:
 		return time.Now()
@@ -107,13 +107,13 @@ func getEventTimestamp(event interface{}) time.Time {
 func deserializeEvent(eventType string, data []byte) (interface{}, error) {
 	switch eventType {
 	case "ItemAdded":
-		var event events.ItemAdded
+		var event octoevents.ItemAdded
 		if err := json.Unmarshal(data, &event); err != nil {
 			return nil, err
 		}
 		return event, nil
 	case "ItemRemoved":
-		var event events.ItemRemoved
+		var event octoevents.ItemRemoved
 		if err := json.Unmarshal(data, &event); err != nil {
 			return nil, err
 		}
