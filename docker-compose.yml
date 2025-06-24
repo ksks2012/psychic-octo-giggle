@@ -1,0 +1,22 @@
+services:
+  nats:
+    image: nats:latest
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+  cart-service:
+    build:
+      context: .  # Use project root as build context
+      dockerfile: cart-service/Dockerfile  # Path to Dockerfile
+    depends_on:
+      - nats
+    environment:
+      - NATS_URL=nats://nats:4222
+  billing-service:
+    build:
+      context: .  # Use project root as build context
+      dockerfile: billing-service/Dockerfile  # Path to Dockerfile
+    depends_on:
+      - nats
+    environment:
+      - NATS_URL=nats://nats:4222
