@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"psychic-octo-giggle/cart-service/application"
 	"psychic-octo-giggle/cart-service/infrastructure"
 	"psychic-octo-giggle/eventstore"
@@ -10,13 +11,18 @@ import (
 
 func main() {
 	// Initialize event store
-	eventStore, err := eventstore.NewGormEventStore("events.db")
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		natsURL = "nats://localhost:4222"
+	}
+
+	eventStore, err := eventstore.NewGormEventStore("./events.db")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Initialize event publisher
-	publisher, err := infrastructure.NewEventPublisher("nats://localhost:4222")
+	publisher, err := infrastructure.NewEventPublisher(natsURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,4 +36,6 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Println("Item added successfully")
+
+	select {}
 }
