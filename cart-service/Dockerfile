@@ -14,7 +14,7 @@ COPY octoevents/ octoevents/
 COPY eventstore/ eventstore/
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /cart-service ./cart-service/main.go
+RUN GOOS=linux go build -o /cart-service ./cart-service/main.go
 
 # Use a minimal base image for the final stage
 FROM alpine:latest
