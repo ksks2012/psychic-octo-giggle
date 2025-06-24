@@ -12,6 +12,7 @@ services:
       - nats
     environment:
       - NATS_URL=nats://nats:4222
+    restart: on-failure
   billing-service:
     build:
       context: .  # Use project root as build context
@@ -20,3 +21,5 @@ services:
       - nats
     environment:
       - NATS_URL=nats://nats:4222
+    restart: on-failure
+    
