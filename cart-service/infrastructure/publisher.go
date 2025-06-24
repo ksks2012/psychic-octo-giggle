@@ -3,50 +3,100 @@ package infrastructure
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 
 	"psychic-octo-giggle/octoevents"
 
-	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-nats/v2/pkg/nats"
-	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/nats-io/nats.go"
 )
 
 type EventPublisher struct {
-	publisher message.Publisher
+	nc *nats.Conn
+	js nats.JetStreamContext
 }
 
 func NewEventPublisher(natsURL string) (*EventPublisher, error) {
-	// Initialize NATS publisher
-	publisher, err := nats.NewPublisher(
-		nats.PublisherConfig{
-			URL:       natsURL,
-			Marshaler: &nats.GobMarshaler{},
-		},
-		watermill.NewStdLogger(false, false),
-	)
+	// Connect to NATS server
+	nc, err := nats.Connect(natsURL, nats.Name("cart-service-publisher"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
 	}
-	return &EventPublisher{publisher: publisher}, nil
+
+	// Initialize JetStream context
+	js, err := nc.JetStream()
+	if err != nil {
+		nc.Close()
+		return nil, fmt.Errorf("failed to initialize JetStream: %w", err)
+	}
+
+	// Check or create the stream
+	streamName := "cart"
+	_, err = js.StreamInfo(streamName)
+	if err != nil {
+		_, err = js.AddStream(&nats.StreamConfig{
+			Name:     streamName,
+			Subjects: []string{"cart.events"},
+			Storage:  nats.FileStorage,
+			MaxMsgs:  -1, // No limit on number of messages
+			MaxAge:   0,  // No expiration
+		})
+		if err != nil {
+			nc.Close()
+			return nil, fmt.Errorf("failed to create stream %s: %w", streamName, err)
+		}
+		log.Printf("Created stream %s", streamName)
+	} else {
+		log.Printf("Stream %s already exists", streamName)
+	}
+
+	return &EventPublisher{
+		nc: nc,
+		js: js,
+	}, nil
+}
+
+func (p *EventPublisher) Close() error {
+	if p.nc != nil {
+		p.nc.Close()
+	}
+	return nil
 }
 
 func (p *EventPublisher) PublishEvent(ctx context.Context, event interface{}) error {
+	if event == nil {
+		return fmt.Errorf("event is nil")
+	}
+
 	// Serialize event to JSON
 	payload, err := json.Marshal(event)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+	if len(payload) == 0 || string(payload) == "{}" {
+		return fmt.Errorf("empty or invalid payload for event: %T", event)
 	}
 
-	// Create Watermill message
-	msg := message.NewMessage(watermill.NewUUID(), payload)
-
-	// Set event type as message metadata
+	// Set event type as NATS message header
 	eventType := getEventType(event)
-	msg.Metadata.Set("event_type", eventType)
+	headers := nats.Header{}
+	headers.Set("event_type", eventType)
 
-	// Publish to NATS topic
+	// Log the event being published
+	log.Printf("Publishing event: type=%s, payload=%s", eventType, string(payload))
+
+	// Publish to NATS JetStream topic
 	topic := "cart.events"
-	return p.publisher.Publish(topic, msg)
+	_, err = p.js.PublishMsg(&nats.Msg{
+		Subject: topic,
+		Data:    payload,
+		Header:  headers,
+	}, nats.Context(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to publish event to %s: %w", topic, err)
+	}
+
+	return nil
 }
 
 // Helper function: get event type
